@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chat</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#0b141a;--panel:#111b21;--panel2:#202c33;--line:#222d34;--text:#e9edef;--sub:#8696a0;--acc:#00a884;--mine:#005c4b;--theirs:#202c33}
+*{box-sizing:border-box;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+html,body{height:100%;background:var(--bg);color:var(--text)}
+button{cursor:pointer;border:0;background:none;color:inherit;font-size:20px}
+input{background:var(--panel2);border:0;color:var(--text);padding:12px 16px;border-radius:12px;outline:none;font-size:15px;width:100%}
+.screen{display:none;height:100%;align-items:center;justify-content:center;padding:20px}
+.screen.on{display:flex}
+.card{background:var(--panel);padding:32px;border-radius:20px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px #0008}
+.card h1{font-size:24px;text-align:center}.card p{color:var(--sub);text-align:center;font-size:14px}
+.btn{background:var(--acc);color:#fff;padding:12px;border-radius:12px;font-size:16px;font-weight:600}
+.err{color:#f15c6d;font-size:13px;text-align:center;min-height:16px}
+#app{display:none;height:100%}#app.on{display:flex}
+#side{width:340px;background:var(--panel);border-inline-end:1px solid var(--line);display:flex;flex-direction:column}
+.top{padding:14px 16px;background:var(--panel2);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+#list{overflow:auto;flex:1}
+.u{display:flex;gap:12px;align-items:center;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line)}
+.u:hover,.u.sel{background:var(--panel2)}
+.u b{flex:1}.badge{background:var(--acc);color:#fff;border-radius:50%;min-width:22px;height:22px;font-size:12px;display:flex;align-items:center;justify-content:center}
+#main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+#empty{margin:auto;color:var(--sub)}
+#chat{display:none;flex-direction:column;height:100%}
+#msgs{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:6px;background:radial-gradient(#ffffff08 1px,transparent 1px) 0 0/22px 22px}
+.m{max-width:min(75%,480px);padding:8px 12px;border-radius:14px;background:var(--theirs);word-break:break-word;align-self:flex-start;border-end-start-radius:4px}
+.m.me{background:var(--mine);align-self:flex-end;border-end-start-radius:14px;border-end-end-radius:4px}
+.m img,.m video{max-width:100%;max-height:320px;border-radius:10px;display:block;cursor:pointer}
+.m audio{max-width:100%;height:40px}
+.m small{display:block;color:#ffffff90;font-size:11px;margin-top:4px;text-align:end}
+.m a{color:#53bdeb}
+#bar{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--panel2)}
+#bar button{width:42px;height:42px;border-radius:50%;flex:none}
+#bar button:hover{background:#ffffff14}
+#bar #send{background:var(--acc)}
+#bar .rec{background:#e53935!important;animation:p 1s infinite}
+@keyframes p{50%{opacity:.5}}
+#back{display:none}
+@media(max-width:720px){#side{width:100%}#main{display:none}#app.chatting #side{display:none}#app.chatting #main{display:flex}#back{display:inline-block}}
+</style>
+</head>
+<body>
+
+<div id="sLogin" class="screen on"><div class="card">
+  <h1>💬 أهلاً بيك</h1><p>سجّل دخولك للمتابعة</p>
+  <input id="lu" placeholder="اسم المستخدم" autocomplete="username">
+  <input id="lp" type="password" placeholder="الباسورد" autocomplete="current-password">
+  <div class="err" id="le"></div>
+  <button class="btn" id="lb">دخول</button>
+</div></div>
+
+<div id="sName" class="screen"><div class="card">
+  <h1>👋 أول مرة؟</h1><p>اختار اسم يظهر للناس في الشات</p>
+  <input id="nu" placeholder="الاسم (حروف أو أرقام)" maxlength="20">
+  <div class="err" id="ne"></div>
+  <button class="btn" id="nb">تأكيد</button>
+</div></div>
+
+<div id="app">
+  <div id="side">
+    <div class="top"><div style="display:flex;gap:10px;align-items:center"><div class="av" id="meAv"></div><b id="meName"></b></div><button id="out" title="خروج">⎋</button></div>
+    <div id="list"></div>
+  </div>
+  <div id="main">
+    <div id="empty">اختار شخص تبدأ معاه محادثة</div>
+    <div id="chat">
+      <div class="top"><button id="back">←</button><div class="av" id="pAv"></div><b id="pName" style="flex:1"></b></div>
+      <div id="msgs"></div>
+      <div id="bar">
+        <button id="attach" title="إرفاق">📎</button>
+        <input type="file" id="file" accept="image/*,video/*,audio/*" hidden>
+        <input id="txt" placeholder="اكتب رسالة" autocomplete="off">
+        <button id="mic" title="تسجيل صوتي">🎙️</button>
+        <button id="send">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== إعدادات Supabase (حط بياناتك هنا) ======
+const SUPABASE_URL = "https://czplaebwesysuqvvllut.supabase.co";
+const SUPABASE_KEY = "sb_publishable_KkoFdhKxuxOhJIQ-EAAGHg_023koB63";
+// ===============================================
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+let loginId = localStorage.getItem("lid"), myName = null, peer = null, seen = new Set(), unread = {}, users = [];
+
+function show(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));$("app").classList.remove("on");
+  id==="app"?$("app").classList.add("on"):$(id).classList.add("on")}
+
+// ---------- تسجيل الدخول من login.txt ----------
+async function doLogin(){
+  const u=$("lu").value.trim(), p=$("lp").value.trim(); $("le").textContent="";
+  try{
+    const t=await (await fetch("login.txt?"+Date.now())).text();
+    const ok=t.split(/\r?\n/).some(l=>{const i=l.indexOf(":");return i>0&&l.slice(0,i).trim()===u&&l.slice(i+1).trim()===p});
+    if(!ok) return $("le").textContent="اسم المستخدم أو الباسورد غلط";
+    loginId=u; localStorage.setItem("lid",u); afterLogin();
+  }catch(e){$("le").textContent="مش قادر أقرأ login.txt (شغّل الموقع من سيرفر مش من الملف مباشرة)"}
+}
+async function afterLogin(){
+  const {data}=await sb.from("profiles").select("*").eq("login_id",loginId).maybeSingle();
+  if(!data) return show("sName");
+  myName=data.username; startApp();
+}
+async function saveName(){
+  const n=$("nu").value.trim(); $("ne").textContent="";
+  if(!/^[A-Za-z0-9_\u0600-\u06FF]{2,20}$/.test(n)) return $("ne").textContent="2-20 حرف/رقم بدون مسافات";
+  const {error}=await sb.from("profiles").insert({login_id:loginId,username:n});
+  if(error) return $("ne").textContent=error.code==="23505"?"الاسم ده مستخدم":"حصل خطأ: "+error.message;
+  myName=n; startApp();
+}
+
+// ---------- التطبيق ----------
+async function startApp(){
+  show("app"); $("meName").textContent=myName; $("meAv").textContent=myName[0].toUpperCase();
+  await loadUsers(); setInterval(loadUsers,15000);
+  sb.channel("msgs").on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},p=>{
+    const m=p.new; if(m.sender!==myName&&m.receiver!==myName) return;
+    const other=m.sender===myName?m.receiver:m.sender;
+    if(other===peer) addMsg(m); else if(m.receiver===myName){unread[m.sender]=(unread[m.sender]||0)+1;renderList()}
+  }).subscribe();
+}
+async function loadUsers(){
+  const {data}=await sb.from("profiles").select("username").neq("username",myName).order("username");
+  users=data||[]; renderList();
+}
+function renderList(){
+  $("list").innerHTML="";
+  users.forEach(u=>{
+    const d=document.createElement("div"); d.className="u"+(u.username===peer?" sel":"");
+    d.innerHTML=`<div class="av">${u.username[0].toUpperCase()}</div><b></b>`+(unread[u.username]?`<span class="badge">${unread[u.username]}</span>`:"");
+    d.querySelector("b").textContent=u.username; d.onclick=()=>openChat(u.username); $("list").appendChild(d);
+  });
+}
+async function openChat(name){
+  peer=name; unread[name]=0; renderList(); seen=new Set();
+  $("empty").style.display="none"; $("chat").style.display="flex"; $("app").classList.add("chatting");
+  $("pName").textContent=name; $("pAv").textContent=name[0].toUpperCase(); $("msgs").innerHTML="";
+  const {data}=await sb.from("messages").select("*")
+    .or(`and(sender.eq.${myName},receiver.eq.${name}),and(sender.eq.${name},receiver.eq.${myName})`)
+    .order("created_at",{ascending:true}).limit(300);
+  (data||[]).forEach(addMsg);
+}
+function addMsg(m){
+  if(seen.has(m.id)) return; seen.add(m.id);
+  const d=document.createElement("div"); d.className="m"+(m.sender===myName?" me":"");
+  let c="";
+  if(m.kind==="image") c=`<img src="${m.file_url}" onclick="window.open(this.src)">`;
+  else if(m.kind==="video") c=`<video src="${m.file_url}" controls preload="metadata"></video>`;
+  else if(m.kind==="audio") c=`<audio src="${m.file_url}" controls preload="metadata"></audio>`;
+  else if(m.kind==="file") c=`<a href="${m.file_url}" target="_blank">📄 ملف</a>`;
+  d.innerHTML=c+`<div class="t" dir="auto"></div><small>${new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</small>`;
+  const t=d.querySelector(".t"); m.body?t.textContent=m.body:t.remove();
+  $("msgs").appendChild(d); $("msgs").scrollTop=$("msgs").scrollHeight;
+}
+async function sendMsg(extra={}){
+  const body=$("txt").value.trim(); if(!peer||(!body&&!extra.file_url)) return;
+  const row={sender:myName,receiver:peer,kind:extra.kind||"text",body:extra.file_url?"":body,file_url:extra.file_url||null};
+  $("txt").value="";
+  const {data,error}=await sb.from("messages").insert(row).select().single();
+  if(error) return alert("فشل الإرسال: "+error.message); addMsg(data);
+}
+async function upload(blob,name,type){
+  const ext=(name.split(".").pop()||"bin").toLowerCase(), path=`${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const {error}=await sb.storage.from("media").upload(path,blob,{contentType:type});
+  if(error){alert("فشل الرفع: "+error.message);return null}
+  return sb.storage.from("media").getPublicUrl(path).data.publicUrl;
+}
+async function sendFile(f){
+  const kind=f.type.startsWith("image/")?"image":f.type.startsWith("video/")?"video":f.type.startsWith("audio/")?"audio":"file";
+  $("attach").textContent="⏳"; const url=await upload(f,f.name,f.type); $("attach").textContent="📎";
+  if(url) sendMsg({kind,file_url:url});
+}
+
+// ---------- تسجيل صوت ----------
+let rec=null,chunks=[];
+$("mic").onclick=async()=>{
+  if(rec){rec.stop();return}
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:true}); rec=new MediaRecorder(s); chunks=[];
+    rec.ondataavailable=e=>chunks.push(e.data);
+    rec.onstop=async()=>{
+      s.getTracks().forEach(t=>t.stop()); $("mic").classList.remove("rec"); const mt=rec.mimeType||"audio/webm"; rec=null;
+      const ext=mt.includes("mp4")?"m4a":mt.includes("ogg")?"ogg":"webm";
+      const url=await upload(new Blob(chunks,{type:mt}),"voice."+ext,mt.split(";")[0]); if(url) sendMsg({kind:"audio",file_url:url});
+    };
+    rec.start(); $("mic").classList.add("rec");
+  }catch(e){alert("مش قادر أفتح المايك (لازم HTTPS وتديله صلاحية)")}
+};
+
+// ---------- أحداث ----------
+$("lb").onclick=doLogin; $("lp").onkeydown=e=>e.key==="Enter"&&doLogin();
+$("nb").onclick=saveName; $("nu").onkeydown=e=>e.key==="Enter"&&saveName();
+$("send").onclick=()=>sendMsg(); $("txt").onkeydown=e=>e.key==="Enter"&&sendMsg();
+$("attach").onclick=()=>$("file").click(); $("file").onchange=e=>{if(e.target.files[0])sendFile(e.target.files[0]);e.target.value=""};
+$("back").onclick=()=>{$("app").classList.remove("chatting");peer=null;renderList()};
+$("out").onclick=()=>{localStorage.removeItem("lid");location.reload()};
+if(loginId) afterLogin();
+</script>
+</body>
+</html>
